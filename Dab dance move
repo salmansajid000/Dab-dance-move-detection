@@ -1,0 +1,123 @@
+#This code was written as project of CP-II.
+#Code written by 2021-MC-52 and 2021-MC-59 on 10-05-2023
+#IDE visual studio python version 3.10
+import cv2
+import time
+import mediapipe as mp
+import tkinter as tk
+from tkinter import filedialog
+from PIL import Image, ImageTk
+import matplotlib.pyplot as plt
+import math
+import numpy as np
+
+class DabMoveAnalyzer:
+    def __init__(self, source):
+        # MediaPipe initialization
+        self.mp_pose = mp.solutions.pose
+        self.mp_drawing = mp.solutions.drawing_utils
+      
+        self.frame_numbers = []
+        self.accuracies = []
+        # Set up video capture
+        self.cap = cv2.VideoCapture(source)
+
+        # Set up MediaPipe pose detection
+        self.pose = self.mp_pose.Pose(min_detection_confidence=0.5, min_tracking_confidence=0.5)
+
+        # Create the main Tkinter window
+        self.root = tk.Tk()
+        self.root.title("Dab Move Analysis")
+
+        # Canvas for displaying the video frames
+        self.canvas = tk.Canvas(self.root, width=640, height=480,background='green')
+        
+
+        self.canvas.pack()
+        self.root.configure(highlightthickness=10, highlightbackground="yellow")
+       
+        # Benchmark for Dab Move detection
+        self.dab_threshold = 0.3
+
+        # Initialize variables for Dab Move detection
+        self.total_frames = self.cap.get(cv2.CAP_PROP_FRAME_COUNT)
+        self.dab_frames = 0
+        camera_button = tk.Button(self.root, text="Capture Video from Camera", bg='yellow', fg='black',command=self.capture_from_camera)
+        file_button = tk.Button(self.root, text="Open Video File", bg='yellow', fg='black',command=self.open_file)
+        camera_button.pack()
+        file_button.pack()
+
+    def capture_from_camera(self):
+        self.capture_and_process_video(0)
+
+    def open_file(self):
+        file_path = filedialog.askopenfilename()
+        self.capture_and_process_video(file_path)
+
+    def capture_and_process_video(self, source):
+        if isinstance(source, str):
+            self.cap = cv2.VideoCapture(source)
+            self.total_frames = self.cap.get(cv2.CAP_PROP_FRAME_COUNT)
+        else:
+            self.cap = cv2.VideoCapture(source)
+            self.total_frames = float("inf")
+
+        # Capture and process video frames
+        start_time = time.time()
+        
+        while (time.time() - start_time) < 10:
+            ret, frame = self.cap.read()
+            if frame is None:
+                return
+            rgb_frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+            results = self.pose.process(rgb_frame)
+
+            if results.pose_landmarks:
+               
+                left_shoulder = results.pose_landmarks.landmark[self.mp_pose.PoseLandmark.LEFT_SHOULDER]
+                right_shoulder = results.pose_landmarks.landmark[self.mp_pose.PoseLandmark.RIGHT_SHOULDER]
+                left_wrist = results.pose_landmarks.landmark[self.mp_pose.PoseLandmark.LEFT_WRIST]
+                right_wrist = results.pose_landmarks.landmark[self.mp_pose.PoseLandmark.RIGHT_WRIST]
+                midpoint_x = int((left_shoulder.x + right_shoulder.x) / 2 * frame.shape[1])
+                midpoint_y = int((left_shoulder.y + right_shoulder.y) / 2 * frame.shape[0])
+
+                # Draw the circle at the midpoint
+                shoulder_distance = abs(left_shoulder.x - right_shoulder.x)
+                wrist_distance = abs(left_wrist.x - right_wrist.x)
+                shoulder_angle = math.atan2(right_shoulder.y - left_shoulder.y, right_shoulder.x - left_shoulder.x)
+                wrist_angle = math.atan2(right_wrist.y - left_wrist.y, right_wrist.x - left_wrist.x)
+
+                if (shoulder_distance > wrist_distance) and (shoulder_angle > wrist_angle) and (shoulder_distance < self.dab_threshold) and (left_wrist.y < left_shoulder.y) and (right_wrist.y < right_shoulder.y):
+                    self.dab_frames += 1
+                    # Display "Dab Move" on the canvas
+                    self.canvas.delete("all")
+                    self.accuracy = self.dab_frames / (self.total_frames / 100)
+                    self.frame_numbers.append(self.cap.get(cv2.CAP_PROP_POS_FRAMES))
+                    self.accuracies.append(self.accuracy)
+                    self.canvas.create_text(320, 440, text="Dab Move Detected", font=("Helvetica", 30), fill="yellow")
+                    break
+                else:
+                    # Display "Not Dab Move" on the canvas
+                    self.canvas.delete("all")
+                    self.canvas.create_text(320, 440, text="Try again, not a Dab move", font=("Helvetica", 30), fill="red")
+            else:
+                self.canvas.delete("all")
+                self.canvas.create_text(320, 440, text="Nothing can be detected from it", font=("Helvetica", 20), fill="black")
+            self.mp_drawing.draw_landmarks(rgb_frame, results.pose_landmarks, self.mp_pose.POSE_CONNECTIONS)
+         
+            
+            # Convert frame back to
+            frame = cv2.cvtColor(rgb_frame, cv2.COLOR_RGB2BGR)
+
+           # Convert frame back to
+            rgb_frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+            cv2.circle(frame, (midpoint_x, midpoint_y), 10, (0, 0, 255), -1)
+
+            # Display the frame on the canvas
+            img = Image.fromarray(frame)
+            img_tk = ImageTk.PhotoImage(image=img)
+            self.canvas.create_image(0, 0, anchor=tk.NW, image=img_tk)
+            self.root.update()
+       
+dab_analyzer = DabMoveAnalyzer(0)
+dab_analyzer.root.mainloop()
