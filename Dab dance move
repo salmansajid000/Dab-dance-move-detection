@@ -1,6 +1,7 @@
 #This code was written as project of CP-II.
 #Code written by 2021-MC-52 and 2021-MC-59 on 10-05-2023
 #IDE visual studio python version 3.10
+
 import cv2
 import time
 import mediapipe as mp
@@ -12,13 +13,11 @@ import math
 import numpy as np
 
 class DabMoveAnalyzer:
-    def __init__(self, source):
+    def _init_(self, source):
         # MediaPipe initialization
         self.mp_pose = mp.solutions.pose
         self.mp_drawing = mp.solutions.drawing_utils
       
-        self.frame_numbers = []
-        self.accuracies = []
         # Set up video capture
         self.cap = cv2.VideoCapture(source)
 
@@ -73,7 +72,6 @@ class DabMoveAnalyzer:
             results = self.pose.process(rgb_frame)
 
             if results.pose_landmarks:
-               
                 left_shoulder = results.pose_landmarks.landmark[self.mp_pose.PoseLandmark.LEFT_SHOULDER]
                 right_shoulder = results.pose_landmarks.landmark[self.mp_pose.PoseLandmark.RIGHT_SHOULDER]
                 left_wrist = results.pose_landmarks.landmark[self.mp_pose.PoseLandmark.LEFT_WRIST]
@@ -92,32 +90,34 @@ class DabMoveAnalyzer:
                     # Display "Dab Move" on the canvas
                     self.canvas.delete("all")
                     self.accuracy = self.dab_frames / (self.total_frames / 100)
-                    self.frame_numbers.append(self.cap.get(cv2.CAP_PROP_POS_FRAMES))
-                    self.accuracies.append(self.accuracy)
                     self.canvas.create_text(320, 440, text="Dab Move Detected", font=("Helvetica", 30), fill="yellow")
+                    plt.plot([0,(time.time() - start_time)], [0,1])
+                    plt.xlabel('Accuracy (The lower the better)')
+                    plt.ylabel('Dab Detected')
+                    plt.show()
                     break
                 else:
                     # Display "Not Dab Move" on the canvas
                     self.canvas.delete("all")
-                    self.canvas.create_text(320, 440, text="Try again, not a Dab move", font=("Helvetica", 30), fill="red")
+                    self.canvas.create_text(320, 440, text="Try again, not a Dab move", font=("Helvetica", 30), fill="red")     
             else:
                 self.canvas.delete("all")
                 self.canvas.create_text(320, 440, text="Nothing can be detected from it", font=("Helvetica", 20), fill="black")
+                
             self.mp_drawing.draw_landmarks(rgb_frame, results.pose_landmarks, self.mp_pose.POSE_CONNECTIONS)
-         
             
             # Convert frame back to
             frame = cv2.cvtColor(rgb_frame, cv2.COLOR_RGB2BGR)
 
            # Convert frame back to
             rgb_frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
-            cv2.circle(frame, (midpoint_x, midpoint_y), 10, (0, 0, 255), -1)
+            cv2.circle(frame, (midpoint_x, midpoint_y),7 , (0, 0, 255), -1)
 
             # Display the frame on the canvas
             img = Image.fromarray(frame)
             img_tk = ImageTk.PhotoImage(image=img)
             self.canvas.create_image(0, 0, anchor=tk.NW, image=img_tk)
             self.root.update()
-       
+    
 dab_analyzer = DabMoveAnalyzer(0)
-dab_analyzer.root.mainloop()
+dab_analyzer.root.mainloop(
